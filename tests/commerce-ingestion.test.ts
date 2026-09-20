@@ -1,22 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { normalizeRecord } from "../server/ingestion/commerce";
+import { canonicalId, normalizeRecord } from "../server/ingestion/commerce";
 import { ScopedCommerceRepository } from "../server/repositories/commerce";
-
-const scope = { organizationId: "org-a", storeId: "store-a", mode: "live" as const };
-const metadata = { platform: "salla" as const, externalId: "product-1", ingestedAt: "2026-09-20T00:00:00Z" };
-describe("canonical commerce ingestion", () => {
-  it("normalizes platform facts with deterministic scoped identity and preserves missing values", () => {
-    const record = normalizeRecord("product", scope, metadata, { name: "Pima", status: "active", createdAt: metadata.ingestedAt });
-    expect(record.record.id).toContain("org-a:store-a:salla:product:product-1"); expect(record.record.sku).toBeUndefined(); expect(record.record.source).toBe("platform");
-  });
-  it("upserts repeated external records without cross-store reads", () => {
-    const repository = new ScopedCommerceRepository(); const first = normalizeRecord("product", scope, metadata, { name: "Pima", status: "active", createdAt: metadata.ingestedAt });
-    repository.upsert(first); repository.upsert(normalizeRecord("product", scope, metadata, { name: "Pima updated", status: "active", createdAt: metadata.ingestedAt }));
-    expect(repository.list("product", scope)).toHaveLength(1); expect(repository.find("product", scope, metadata.externalId)?.name).toBe("Pima updated");
-    expect(repository.find("product", { ...scope, storeId: "store-b" }, metadata.externalId)).toBeUndefined();
-  });
-  it("rejects records whose canonical scope does not match ingestion scope", () => {
-    const repository = new ScopedCommerceRepository(); const record = normalizeRecord("product", scope, metadata, { name: "Pima", status: "active", createdAt: metadata.ingestedAt });
-    expect(() => repository.upsert({ ...record, record: { ...record.record, organizationId: "org-b" } })).toThrow("scope");
-  });
+const scope={organizationId:"org-a",storeId:"store-a",mode:"live" as const}; const meta=(platform:"salla"|"zid"="salla",externalId="x")=>({platform,externalId,ingestedAt:"2026-09-20",sourceUpdatedAt:"2026-09-19"});
+describe("canonical commerce ingestion",()=>{
+ it("creates persistence-compatible IDs and preserves platform metadata",()=>{const id=canonicalId(scope,"salla","product","x");expect(id).toMatch(/^[0-9a-f-]{36}$/);const p=normalizeRecord("product",scope,meta(),{name:"Pima",status:"active",createdAt:"2026"});expect(p.record.sku).toBeUndefined();expect(p.record.sourceUpdatedAt).toBe("2026-09-19");});
+ it("keeps all six explicit entity paths",()=>{expect(normalizeRecord("variant",scope,meta(),{productId:"p",name:"v",status:"active",createdAt:"x"}).entity).toBe("variant");expect(normalizeRecord("customer",scope,meta(),{status:"actual"}).entity).toBe("customer");expect(normalizeRecord("order",scope,meta(),{status:"paid",currency:"SAR",merchandiseGross:1,discounts:0,shippingCharged:0,refundedAmount:0,revenueBasis:"unknown",orderedAt:"x"}).entity).toBe("order");expect(normalizeRecord("order_item",scope,meta(),{orderId:"o",title:"i",quantity:1,returnedQuantity:0,unitGross:1,discountAmount:0}).entity).toBe("order_item");expect(normalizeRecord("inventory",scope,meta(),{productId:"p",source:"platform",status:"no_data",observedAt:"x"}).entity).toBe("inventory");});
+ it("upserts by platform identity and isolates scope",()=>{const repo=new ScopedCommerceRepository();const a=normalizeRecord("product",scope,meta("salla","same"),{name:"A",status:"active",createdAt:"x"});const b=normalizeRecord("product",scope,meta("zid","same"),{name:"B",status:"active",createdAt:"x"});repo.upsert(a);repo.upsert({...a,record:{...a.record,name:"A2"}});repo.upsert(b);expect(repo.list("product",scope)).toHaveLength(2);expect(repo.find("product",scope,"salla","same")?.record.name).toBe("A2");expect(repo.find("product",{...scope,storeId:"other"},"salla","same")).toBeUndefined();});
+ it("rejects missing external IDs and mismatched scope",()=>{expect(()=>normalizeRecord("product",scope,meta("salla",""),{name:"A",status:"active",createdAt:"x"})).toThrow();const repo=new ScopedCommerceRepository();const p=normalizeRecord("product",scope,meta(),{name:"A",status:"active",createdAt:"x"});expect(()=>repo.upsert({...p,record:{...p.record,organizationId:"other"}})).toThrow();});
 });

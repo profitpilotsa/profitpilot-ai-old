@@ -7,7 +7,7 @@ export type RevenueBasis = "tax_inclusive" | "tax_exclusive" | "unknown";
 export interface Product extends DataScope { id: Id; externalId?: string; source: Provenance; name: string; sku?: string; status: ProductStatus; createdAt: string; sourceUpdatedAt?: string; }
 export interface Variant extends DataScope { id: Id; productId: Id; externalId?: string; source: Provenance; name: string; sku?: string; status: ProductStatus; createdAt: string; sourceUpdatedAt?: string; }
 export interface Order extends DataScope { id: Id; externalId?: string; customerId?: Id; source: Provenance; status: OrderStatus; currency: string; merchandiseGross: MinorUnit; discounts: MinorUnit; taxAmount?: MinorUnit; shippingCharged: MinorUnit; refundedAmount: MinorUnit; revenueBasis: RevenueBasis; orderedAt: string; sourceUpdatedAt?: string; }
-export interface OrderItem extends DataScope { id: Id; orderId: Id; productId?: Id; variantId?: Id; externalId?: string; source: Provenance; title: string; quantity: number; returnedQuantity: number; unitGross: MinorUnit; discountAmount: MinorUnit; }
+export interface OrderItem extends DataScope { id: Id; orderId: Id; productId?: Id; variantId?: Id; externalId?: string; source: Provenance; title: string; quantity: number; returnedQuantity: number; unitGross: MinorUnit; discountAmount: MinorUnit; sourceUpdatedAt?: string; }
 export type CostCategory = "product_cost" | "shipping" | "customs" | "packaging" | "payment_fee" | "advertising" | "subscription" | "other";
 export type CostScope = "store" | "product" | "variant" | "order" | "campaign";
 export type CostCalculation = "fixed" | "per_order" | "per_product" | "per_unit" | "percentage" | "imported" | "calculated";

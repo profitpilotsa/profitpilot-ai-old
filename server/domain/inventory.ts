@@ -4,7 +4,7 @@ import type { DataScope, Id, Provenance } from "./tenant";
 export type OperationalStatus = "actual" | "estimated" | "incomplete" | "no_data";
 export type DecisionStatus = "detected" | "explained" | "adjusted" | "approval_required" | "approved" | "executed" | "failed";
 
-export interface InventoryState extends DataScope { id: Id; productId: Id; variantId?: Id; currentStock?: number; availableStock?: number; reservedStock?: number; inboundStock?: number; source: Provenance; status: OperationalStatus; observedAt: string; }
+export interface InventoryState extends DataScope { id: Id; productId: Id; variantId?: Id; currentStock?: number; availableStock?: number; reservedStock?: number; inboundStock?: number; source: Provenance; status: OperationalStatus; observedAt: string; sourceUpdatedAt?: string; }
 export interface SalesHistory extends DataScope { productId: Id; variantId?: Id; unitsSold?: number; periodDays?: number; source: Provenance; status: OperationalStatus; periodFrom?: string; periodTo?: string; }
 export interface Supplier extends DataScope { id: Id; name: string; source: Provenance; status: OperationalStatus; reliability?: "high" | "medium" | "low"; lastOrderAt?: string; notes?: string; }
 export interface SupplierProduct extends DataScope { id: Id; supplierId: Id; productId: Id; variantId?: Id; unitCost?: MinorUnit; currency: string; leadTimeDays?: number; moq?: number; expectedDeliveryAt?: string; source: Provenance; status: OperationalStatus; reference?: string; notes?: string; }
