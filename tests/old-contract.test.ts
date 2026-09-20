@@ -43,4 +43,8 @@ describe("OLD visual and interaction contract", () => {
     expect(home).not.toContain("All systems synced · 2 min ago");
     expect(home).not.toContain("Export prepared: product-true-profit-sep-2026.csv");
   });
+  it("keeps Cost controls truthful when their state is local-only", () => {
+    for (const item of ["Demo preview updated for this session; changes are not persisted or recalculated.", "Demo cost-rule row added for this session; it is not saved.", "marked disabled in this demo session only."]) expect(home).toContain(item);
+    expect(home).not.toContain('import { toast } from "sonner"');
+  });
 });

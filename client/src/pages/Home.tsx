@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { toast } from "sonner";
+import { toast as showToast } from "sonner";
 import { demoCostConfigurations, demoProductProfitability } from "@/application/trueCostAdapter";
 import { demoCashAwareDecision, demoInventoryDisplays, demoOrderDisplay } from "@/application/inventoryAdapter";
 import { demoCampaignDisplay, demoCashFlowDisplay, demoCustomerDisplay } from "@/application/customerMarketingAdapter";
@@ -49,6 +49,15 @@ import {
 } from "lucide-react";
 
 type NavItem = { label: string; href: string; icon: React.ElementType; count?: string };
+
+const toast = (message: string) => {
+  if (message === "Product cost rules saved and True Product Cost recalculated.") return showToast("Demo preview updated for this session; changes are not persisted or recalculated.");
+  if (message === "New cost rule added. Edit the values to save it.") return showToast("Demo cost-rule row added for this session; it is not saved.");
+  if (message.endsWith(" editor opened. Changes will recalculate True Cost.")) return showToast(`${message.replace(". Changes will recalculate True Cost.", "")} demo editor opened; changes are not saved or recalculated.`);
+  if (message.endsWith(" disabled for future calculations.")) return showToast(`${message.replace(" disabled for future calculations.", "")} marked disabled in this demo session only.`);
+  if (message === "New subscription added. Edit its amount and category.") return showToast("Demo subscription row added for this session; it is not saved.");
+  return showToast(message);
+};
 
 const navGroups: { label: string; items: NavItem[] }[] = [
   {
