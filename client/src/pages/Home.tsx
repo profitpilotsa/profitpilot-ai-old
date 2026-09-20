@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { Phase2BCosts, Phase2BProductProfitability } from "@/components/Phase2BExperience";
 import {
   Activity,
   ArrowDownRight,
@@ -357,8 +358,10 @@ function NotFoundScreen() { const navigate = useAppNavigation(); return <div cla
 
 export default function Home() {
   const [location] = useLocation();
+  const navigate = useAppNavigation();
   const path = useMemo(() => location.split("?")[0] || "/", [location]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const Screen = path === "/" ? Dashboard : path === "/decisions" ? DecisionCenter : path === "/products" ? ProductProfitability : path === "/inventory" ? InventoryIntelligence : path === "/cash" ? CashAwareDecision : path === "/true-cost" ? TrueCostEngine : path === "/costs" ? CostOverview : path === "/cost-settings" ? CostSettings : path === "/shipping-costs" ? () => <ManagementTable type="shipping" /> : path === "/payment-fees" ? () => <ManagementTable type="payment" /> : path === "/packaging-costs" ? () => <ManagementTable type="packaging" /> : path === "/advertising-costs" ? () => <ManagementTable type="advertising" /> : path === "/subscriptions" ? Subscriptions : path === "/other-costs" ? () => <ManagementTable type="other" /> : path === "/marketing" ? () => <MarketingHub initialTab="overview" /> : path === "/marketing/platforms" ? () => <MarketingHub initialTab="platforms" /> : path === "/marketing/campaigns" ? () => <MarketingHub initialTab="campaigns" /> : path === "/marketing/tracking" ? () => <MarketingHub initialTab="tracking" /> : path === "/brain" ? BusinessBrain : path === "/analyst" ? AIAnalyst : path === "/actions" ? ActionCenter : NotFoundScreen;
+  const phase2BCostFocus = path === "/costs" ? "overview" : path.slice(1);
+  const Screen = path === "/" ? Dashboard : path === "/decisions" ? DecisionCenter : path === "/products" ? () => <Phase2BProductProfitability onNavigate={navigate} /> : path === "/inventory" ? InventoryIntelligence : path === "/cash" ? CashAwareDecision : path === "/true-cost" ? TrueCostEngine : ["/costs", "/cost-settings", "/shipping-costs", "/payment-fees", "/packaging-costs", "/advertising-costs", "/subscriptions", "/other-costs"].includes(path) ? () => <Phase2BCosts onNavigate={navigate} focus={phase2BCostFocus} /> : path === "/marketing" ? () => <MarketingHub initialTab="overview" /> : path === "/marketing/platforms" ? () => <MarketingHub initialTab="platforms" /> : path === "/marketing/campaigns" ? () => <MarketingHub initialTab="campaigns" /> : path === "/marketing/tracking" ? () => <MarketingHub initialTab="tracking" /> : path === "/brain" ? BusinessBrain : path === "/analyst" ? AIAnalyst : path === "/actions" ? ActionCenter : NotFoundScreen;
   return <div className="app-shell"><Sidebar path={path} open={sidebarOpen} onClose={() => setSidebarOpen(false)} /><main className="main"><Topbar path={path} onMenu={() => setSidebarOpen(true)} /><Screen /></main></div>;
 }
