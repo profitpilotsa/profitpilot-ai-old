@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { Phase2BCosts, Phase2BProductProfitability } from "@/components/Phase2BExperience";
+import { demoCostConfigurations, demoProductProfitability } from "@/application/trueCostAdapter";
 import {
   Activity,
   ArrowDownRight,
@@ -95,23 +95,10 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-const products = [
-  { name: "IRONCLAD Pima T-Shirt", code: "PMA-001", revenue: "29,800 SAR", profit: "12,940 SAR", margin: "43.4%", trend: "+18%", stock: "85", coverage: "10 days", status: "At risk", tone: "red", toneClass: "bad", units: "200", trueCost: "16,860 SAR", productCost: "8,400 SAR", shipping: "3,600 SAR", packaging: "600 SAR", payment: "900 SAR", ads: "2,400 SAR", subscriptions: "360 SAR", other: "600 SAR" },
-  { name: "IRONCLAD Spandex T-Shirt", code: "SPX-014", revenue: "19,600 SAR", profit: "6,400 SAR", margin: "32.7%", trend: "-9%", stock: "142", coverage: "24 days", status: "Margin down", tone: "amber", toneClass: "warn", units: "140", trueCost: "13,200 SAR", productCost: "6,200 SAR", shipping: "2,520 SAR", packaging: "420 SAR", payment: "590 SAR", ads: "2,080 SAR", subscriptions: "280 SAR", other: "1,110 SAR" },
-  { name: "Burgundy Overshirt", code: "BRG-008", revenue: "14,200 SAR", profit: "5,640 SAR", margin: "39.7%", trend: "+4%", stock: "490", coverage: "61 days", status: "Overstocked", tone: "violet", toneClass: "good", units: "70", trueCost: "8,560 SAR", productCost: "3,500 SAR", shipping: "1,260 SAR", packaging: "210 SAR", payment: "430 SAR", ads: "1,400 SAR", subscriptions: "210 SAR", other: "1,550 SAR" },
-  { name: "Studio Socks Set", code: "STS-022", revenue: "9,480 SAR", profit: "4,029 SAR", margin: "42.5%", trend: "+12%", stock: "210", coverage: "37 days", status: "Healthy", tone: "teal", toneClass: "good", units: "60", trueCost: "5,451 SAR", productCost: "2,100 SAR", shipping: "1,080 SAR", packaging: "180 SAR", payment: "290 SAR", ads: "720 SAR", subscriptions: "108 SAR", other: "973 SAR" },
-];
-
-const costBreakdown = [
-  { label: "Product purchase cost", value: "42.00 SAR", source: "Manual", tone: "violet" },
-  { label: "Supplier shipping", value: "3.00 SAR", source: "Manual", tone: "violet" },
-  { label: "Customs / import", value: "0.00 SAR", source: "Not configured", tone: "amber" },
-  { label: "Packaging", value: "3.00 SAR", source: "Calculated", tone: "teal" },
-  { label: "Customer shipping", value: "18.00 SAR", source: "Imported", tone: "teal" },
-  { label: "Payment fee", value: "4.50 SAR", source: "Calculated", tone: "teal" },
-  { label: "Advertising allocation", value: "12.00 SAR", source: "Estimated", tone: "amber" },
-  { label: "Subscription allocation", value: "1.80 SAR", source: "Calculated", tone: "teal" },
-];
+const profitabilityModels = demoProductProfitability();
+const products = profitabilityModels.map((product, index) => ({ name: product.name, code: product.sku, revenue: product.revenue.display, profit: product.trueProfit.display, margin: product.margin, trend: index === 1 ? "-9%" : "+12%", stock: String(product.inventory?.stock ?? "—"), coverage: product.inventory?.coverage ?? "No data", status: product.inventory?.signal ?? product.status, tone: product.status === "incomplete" ? "amber" : product.inventory?.tone === "bad" ? "red" : "teal", toneClass: product.status === "incomplete" ? "warn" : "good", units: "Demo", trueCost: product.trueCost.display, productCost: product.components.find((cost) => cost.key === "productCost")?.amount.display ?? "Incomplete — not configured", shipping: product.components.find((cost) => cost.key === "shipping")?.amount.display ?? "Incomplete — not configured", packaging: product.components.find((cost) => cost.key === "packaging")?.amount.display ?? "Incomplete — not configured", payment: product.components.find((cost) => cost.key === "paymentFees")?.amount.display ?? "Incomplete — not configured", ads: product.components.find((cost) => cost.key === "advertisingAllocation")?.amount.display ?? "Incomplete — not configured", subscriptions: product.components.find((cost) => cost.key === "subscriptionAllocation")?.amount.display ?? "Incomplete — not configured", other: product.components.find((cost) => cost.key === "otherCosts")?.amount.display ?? "Incomplete — not configured" }));
+const costBreakdown = profitabilityModels[0].components.map((cost) => ({ label: cost.label, value: cost.amount.display, source: cost.status === "not_configured" ? "Not configured" : cost.source[0].toUpperCase() + cost.source.slice(1), tone: cost.status === "incomplete" || cost.status === "not_configured" ? "amber" : cost.status === "estimated" ? "amber" : "teal" }));
+const costRuleModels = demoCostConfigurations();
 
 const initialActions = [
   { id: 1, title: "Review Pima reorder", subtitle: "Stockout in 9 days • recommended quantity 200", icon: Package, tone: "red", primary: "Review" },
@@ -358,10 +345,8 @@ function NotFoundScreen() { const navigate = useAppNavigation(); return <div cla
 
 export default function Home() {
   const [location] = useLocation();
-  const navigate = useAppNavigation();
   const path = useMemo(() => location.split("?")[0] || "/", [location]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const phase2BCostFocus = path === "/costs" ? "overview" : path.slice(1);
-  const Screen = path === "/" ? Dashboard : path === "/decisions" ? DecisionCenter : path === "/products" ? () => <Phase2BProductProfitability onNavigate={navigate} /> : path === "/inventory" ? InventoryIntelligence : path === "/cash" ? CashAwareDecision : path === "/true-cost" ? TrueCostEngine : ["/costs", "/cost-settings", "/shipping-costs", "/payment-fees", "/packaging-costs", "/advertising-costs", "/subscriptions", "/other-costs"].includes(path) ? () => <Phase2BCosts onNavigate={navigate} focus={phase2BCostFocus} /> : path === "/marketing" ? () => <MarketingHub initialTab="overview" /> : path === "/marketing/platforms" ? () => <MarketingHub initialTab="platforms" /> : path === "/marketing/campaigns" ? () => <MarketingHub initialTab="campaigns" /> : path === "/marketing/tracking" ? () => <MarketingHub initialTab="tracking" /> : path === "/brain" ? BusinessBrain : path === "/analyst" ? AIAnalyst : path === "/actions" ? ActionCenter : NotFoundScreen;
+  const Screen = path === "/" ? Dashboard : path === "/decisions" ? DecisionCenter : path === "/products" ? ProductProfitability : path === "/inventory" ? InventoryIntelligence : path === "/cash" ? CashAwareDecision : path === "/true-cost" ? TrueCostEngine : path === "/costs" ? CostOverview : path === "/cost-settings" ? CostSettings : path === "/shipping-costs" ? () => <ManagementTable type="shipping" /> : path === "/payment-fees" ? () => <ManagementTable type="payment" /> : path === "/packaging-costs" ? () => <ManagementTable type="packaging" /> : path === "/advertising-costs" ? () => <ManagementTable type="advertising" /> : path === "/subscriptions" ? Subscriptions : path === "/other-costs" ? () => <ManagementTable type="other" /> : path === "/marketing" ? () => <MarketingHub initialTab="overview" /> : path === "/marketing/platforms" ? () => <MarketingHub initialTab="platforms" /> : path === "/marketing/campaigns" ? () => <MarketingHub initialTab="campaigns" /> : path === "/marketing/tracking" ? () => <MarketingHub initialTab="tracking" /> : path === "/brain" ? BusinessBrain : path === "/analyst" ? AIAnalyst : path === "/actions" ? ActionCenter : NotFoundScreen;
   return <div className="app-shell"><Sidebar path={path} open={sidebarOpen} onClose={() => setSidebarOpen(false)} /><main className="main"><Topbar path={path} onMenu={() => setSidebarOpen(true)} /><Screen /></main></div>;
 }
