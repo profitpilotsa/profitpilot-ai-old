@@ -27,6 +27,7 @@ describe("OLD visual and interaction contract", () => {
   });
   it("keeps OLD inventory and cash routes while using Step 2 adapters", () => {
     for (const item of ['function InventoryIntelligence()', 'function CashAwareDecision()', 'demoInventoryDisplays()', 'demoCashAwareDecision(qty)', 'Save decision']) expect(home).toContain(item);
+    expect(home).toContain("Demo decision marked for review; it is not persisted or executed.");
     expect(home).not.toContain("Phase2BStep2Experience");
   });
 });
