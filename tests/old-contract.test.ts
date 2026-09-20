@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const home = readFileSync(path.join(process.cwd(), "client", "src", "pages", "Home.tsx"), "utf8");
+const componentLine = (signature: string) => home.split("\n").find((line) => line.includes(signature)) ?? "";
 
 describe("OLD visual and interaction contract", () => {
   it("retains the approved route map", () => {
@@ -13,5 +14,15 @@ describe("OLD visual and interaction contract", () => {
   });
   it("retains critical decision and AI affordances", () => {
     for (const item of ['Save decision', 'Ask ProfitPilot', 'AI Analyst', 'Review true cost breakdown']) expect(home).toContain(item);
+  });
+  it("keeps OLD Costs routes and integrates semantics inside their components", () => {
+    for (const route of ['path === "/costs" ? CostOverview', 'path === "/cost-settings" ? CostSettings', 'path === "/subscriptions" ? Subscriptions', 'path === "/shipping-costs" ? () => <ManagementTable type="shipping" />']) expect(home).toContain(route);
+    for (const signature of ["function CostOverview()", "function CostSettings()", "function ManagementTable", "function Subscriptions()"]) expect(componentLine(signature)).toContain("<CostSemanticPanel");
+    expect(home).not.toContain("<Screen />{isCostRoute");
+    expect(home).not.toContain("Phase2BExperience");
+  });
+  it("keeps the missing-cost presentation explicit", () => {
+    const panel = readFileSync(path.join(process.cwd(), "client", "src", "components", "CostSemanticPanel.tsx"), "utf8");
+    expect(panel).toContain("never presented as SAR 0.00");
   });
 });

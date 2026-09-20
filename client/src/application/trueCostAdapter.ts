@@ -24,15 +24,16 @@ export interface CostConfigurationView {
 const sar = new Intl.NumberFormat("en-SA", { style: "currency", currency: "SAR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const presentMoney = (value?: MinorUnit): MoneyView => value === undefined ? { display: "Incomplete — not configured", unavailable: true } : { minorUnits: value, display: sar.format(value / 100), unavailable: false };
 const source = (value: string): CostSource => value === "platform" ? "automatic" : value as CostSource;
-const componentNames: Array<[keyof Pick<TrueCostResult, "productCost" | "shipping" | "customs" | "packaging" | "paymentFees" | "advertisingAllocation" | "subscriptionAllocation" | "otherCosts">, string]> = [
-  ["productCost", "Product cost"], ["shipping", "Shipping"], ["customs", "Customs / import"], ["packaging", "Packaging"], ["paymentFees", "Payment fee"], ["advertisingAllocation", "Advertising allocation"], ["subscriptionAllocation", "Subscription allocation"], ["otherCosts", "Other costs"],
+const componentNames: Array<[keyof Pick<TrueCostResult, "productCost" | "shipping" | "customs" | "packaging" | "paymentFees" | "advertisingAllocation" | "subscriptionAllocation" | "otherCosts">, string, string]> = [
+  ["productCost", "Product cost", "Product cost"], ["shipping", "Shipping", "Shipping"], ["customs", "Customs / import", "Customs / import"], ["packaging", "Packaging", "Packaging"], ["paymentFees", "Payment fee", "Payment fees"], ["advertisingAllocation", "Advertising allocation", "Advertising allocation"], ["subscriptionAllocation", "Subscription allocation", "Subscription allocation"], ["otherCosts", "Other costs", "Other costs"],
 ];
 
 export function adaptTrueCostResult(result: TrueCostResult, product: Pick<ProductProfitabilityView, "id" | "name" | "sku" | "inventory">): ProductProfitabilityView {
   const missing = new Set(result.missingComponents);
-  const components = componentNames.map(([key, label]) => {
+  const components = componentNames.map(([key, label, missingLabel]) => {
     const breakdown = result.breakdown.find((item) => item.category === ({ productCost: "product_cost", shipping: "shipping", customs: "customs", packaging: "packaging", paymentFees: "payment_fee", advertisingAllocation: "advertising", subscriptionAllocation: "subscription", otherCosts: "other" } as Record<string, string>)[key]);
-    const missingComponent = [...missing].some((name) => name.toLowerCase().includes(label.split(" ")[0].toLowerCase()));
+    // Phase 2A exposes missing component names, not category IDs; match its canonical labels exactly.
+    const missingComponent = missing.has(missingLabel);
     return { key, label, amount: presentMoney(missingComponent ? undefined : result[key]), status: (missingComponent ? "incomplete" : breakdown?.status ?? "not_configured") as CostDisplayStatus, source: source(breakdown?.source ?? "manual"), calculation: breakdown?.method ?? "not configured", missing: missingComponent };
   });
   return { ...product, revenue: presentMoney(result.revenue), discounts: presentMoney(result.discounts), trueCost: presentMoney(result.trueCost), grossProfit: presentMoney(result.grossProfit ?? undefined), trueProfit: presentMoney(result.trueProfit ?? undefined), margin: result.marginBps === null ? "—" : `${(result.marginBps / 100).toFixed(1)}%`, status: result.status, missingComponents: result.missingComponents, estimatedComponents: result.estimatedComponents, sources: Array.from(result.sources, source), calculatedAt: result.calculatedAt, version: result.version, components };
@@ -61,7 +62,13 @@ export function demoProductProfitability(): ProductProfitabilityView[] {
   const golden = calculateTrueCost({ order: goldenOrder, items: goldenItems, rules: goldenRules, calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" });
   const complete = calculateTrueCost({ order: { ...goldenOrder, id: "order-spandex", merchandiseGross: money(19600), discounts: money(800), shippingCharged: money(800) }, items: [{ ...goldenItems[0], id: "line-spandex", orderId: "order-spandex", productId: "spandex", variantId: "spandex-black-m", title: "IRONCLAD Spandex T-Shirt", quantity: 4 }], rules: baseRules.map((rule) => rule.id === "product-pima" ? { ...rule, id: "product-spandex", targetId: "spandex-black-m", amount: money(3100) } : rule), calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" });
   const missingShipping = calculateTrueCost({ order: { ...goldenOrder, id: "order-socks", merchandiseGross: money(9480), discounts: money(0), shippingCharged: money(0) }, items: [{ ...goldenItems[0], id: "line-socks", orderId: "order-socks", productId: "socks", variantId: "socks-set", title: "Studio Socks Set", quantity: 3 }], rules: baseRules.filter((rule) => rule.category !== "shipping").map((rule) => rule.id === "product-pima" ? { ...rule, id: "product-socks", targetId: "socks-set", amount: money(700) } : rule), calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" });
-  return [adaptTrueCostResult(golden, { id: "pima", name: "IRONCLAD Pima T-Shirt", sku: "PMA-001", inventory: { stock: 85, coverage: "10 days", signal: "At risk", tone: "bad" } }), adaptTrueCostResult(complete, { id: "spandex", name: "IRONCLAD Spandex T-Shirt", sku: "SPX-014", inventory: { stock: 142, coverage: "24 days", signal: "Margin down", tone: "warn" } }), adaptTrueCostResult(missingShipping, { id: "socks", name: "Studio Socks Set", sku: "STS-022", inventory: { stock: 210, coverage: "37 days", signal: "Incomplete cost data", tone: "warn" } })];
+  const noData = (): MoneyView => ({ display: "No data", unavailable: true });
+  const unavailableProduct: ProductProfitabilityView = {
+    id: "burgundy", name: "Burgundy Overshirt", sku: "BRG-008", inventory: { stock: 490, coverage: "61 days", signal: "No True Cost data", tone: "warn" },
+    revenue: noData(), discounts: noData(), trueCost: noData(), grossProfit: noData(), trueProfit: noData(), margin: "—", status: "no_data", missingComponents: ["No engine-backed order or cost data"], estimatedComponents: [], sources: ["demo"], calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo",
+    components: componentNames.map(([key, label]) => ({ key, label, amount: noData(), status: "no_data", source: "demo", calculation: "not configured", missing: true })),
+  };
+  return [adaptTrueCostResult(golden, { id: "pima", name: "IRONCLAD Pima T-Shirt", sku: "PMA-001", inventory: { stock: 85, coverage: "10 days", signal: "At risk", tone: "bad" } }), adaptTrueCostResult(complete, { id: "spandex", name: "IRONCLAD Spandex T-Shirt", sku: "SPX-014", inventory: { stock: 142, coverage: "24 days", signal: "Margin down", tone: "warn" } }), unavailableProduct, adaptTrueCostResult(missingShipping, { id: "socks", name: "Studio Socks Set", sku: "STS-022", inventory: { stock: 210, coverage: "37 days", signal: "Incomplete cost data", tone: "warn" } })];
 }
 
 export function demoCostConfigurations(): CostConfigurationView[] {
