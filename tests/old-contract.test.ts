@@ -34,4 +34,7 @@ describe("OLD visual and interaction contract", () => {
     for (const item of ['href: "/customers"', 'function CustomerIntelligence()', 'demoCustomerDisplay()', 'demoCampaignDisplay()', 'demoCashFlowDisplay()']) expect(home).toContain(item);
     expect(home).not.toContain("Step3Experience");
   });
+  it("binds OLD Marketing Overview to structured Step 3 campaign data", () => {
+    for (const item of ['campaignModel.spend', 'campaignModel.revenue', 'campaignModel.trueProfit', 'campaignModel.margin', 'campaignModel.roas', 'campaignModel.cac', 'campaignModel.advertisingCostTreatment']) expect(home).toContain(item);
+  });
 });
