@@ -15,6 +15,7 @@ export interface TrueCostResult {
 const isEffective = (rule: CostRule, at: string) => rule.effectiveFrom <= at && (!rule.effectiveTo || rule.effectiveTo > at) && rule.status !== "not_configured";
 const categoryLabel: Record<CostCategory, string> = { product_cost: "Product cost", shipping: "Shipping", customs: "Customs / import", packaging: "Packaging", payment_fee: "Payment fees", advertising: "Advertising allocation", subscription: "Subscription allocation", other: "Other costs" };
 const categoryStatus = (rule: CostRule): FinancialStatus => rule.status === "actual" ? "actual" : rule.status === "estimated" ? "estimated" : "incomplete";
+const sharesOrderScope = (order: Order, record: { organizationId: string; storeId?: string }) => record.organizationId === order.organizationId && record.storeId === order.storeId;
 
 function evaluate(rule: CostRule, order: Order, items: OrderItem[]): MinorUnit | undefined {
   const units = items.reduce((sum, item) => sum + Math.max(0, item.quantity - item.returnedQuantity), 0);
@@ -30,6 +31,7 @@ function evaluate(rule: CostRule, order: Order, items: OrderItem[]): MinorUnit |
 
 export function calculateTrueCost(input: TrueCostInput): TrueCostResult {
   const { order, items } = input;
+  if (items.some(item => !sharesOrderScope(order, item)) || input.rules.some(rule => !sharesOrderScope(order, rule)) || (input.allocations ?? []).some(allocation => !sharesOrderScope(order, allocation))) return incompleteScope(order, input);
   if (order.status === "cancelled") return empty(order, input, "excluded");
   const revenue = subtractMoney(addMoney(order.merchandiseGross, order.shippingCharged), addMoney(order.discounts, order.refundedAmount));
   const breakdown: Component[] = [
@@ -65,6 +67,10 @@ export function calculateTrueCost(input: TrueCostInput): TrueCostResult {
   const status: FinancialStatus = missing.size ? "incomplete" : estimated.size || order.source === "estimated" || order.source === "demo" ? "estimated" : "actual";
   const trueProfit = status === "incomplete" ? null : subtractMoney(revenue, trueCost);
   return { status, missingComponents: [...missing], estimatedComponents: [...estimated], sources: [...sources], revenue, discounts: order.discounts, productCost: totals.product_cost, shipping: totals.shipping, customs: totals.customs, packaging: totals.packaging, paymentFees: totals.payment_fee, advertisingAllocation: totals.advertising, subscriptionAllocation: totals.subscription, otherCosts: totals.other, trueCost, grossProfit, trueProfit, marginBps: trueProfit === null || revenue === 0 ? null : Math.round((trueProfit * 10_000) / revenue), breakdown, calculatedAt: input.calculatedAt, version: input.version ?? "2A.1", handling: { cancelled: "not_applicable", refunds: refundPolicy } };
+}
+
+function incompleteScope(order: Order, input: TrueCostInput): TrueCostResult {
+  return { status: "incomplete", missingComponents: ["Tenant/store scope mismatch in True Cost inputs"], estimatedComponents: [], sources: [order.source], revenue: zeroMoney, discounts: order.discounts, productCost: zeroMoney, shipping: zeroMoney, customs: zeroMoney, packaging: zeroMoney, paymentFees: zeroMoney, advertisingAllocation: zeroMoney, subscriptionAllocation: zeroMoney, otherCosts: zeroMoney, trueCost: zeroMoney, grossProfit: null, trueProfit: null, marginBps: null, breakdown: [], calculatedAt: input.calculatedAt, version: input.version ?? "2A.1", handling: { cancelled: "not_applicable", refunds: "none" } };
 }
 
 function empty(order: Order, input: TrueCostInput, cancelled: "excluded"): TrueCostResult {

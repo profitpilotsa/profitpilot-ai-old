@@ -15,6 +15,12 @@ describe("true cost engine", () => {
   it("uses documented store allocations without arbitrary spreading", () => { const result = calculate({ allocations: [{ ...scope, id: "allocation", costRuleId: "packaging", orderId: order.id, amount: money(60), strategy: "period_allocation", source: "calculated", status: "actual" }] }); expect(result.packaging).toBe(260); expect(result.breakdown.some(component => component.method === "allocation:period_allocation")).toBe(true); });
   it("honours cost history effective dates", () => { const result = calculate({ rules: [...coreRules, { ...coreRules[0], id: "future-cost", amount: money(9_999), effectiveFrom: "2026-02-01T00:00:00Z" }] }); expect(result.productCost).toBe(4_000); });
   it("keeps organization scoping in canonical records", () => expect(order.organizationId).toBe("org-a"));
+  it("rejects organization or store mismatches instead of calculating True Cost", () => {
+    for (const mismatchedItem of [{ ...items[0], organizationId: "org-b" }, { ...items[0], storeId: "store-b" }]) {
+      const result = calculate({ items: [mismatchedItem] });
+      expect(result.status).toBe("incomplete"); expect(result.trueProfit).toBeNull(); expect(result.missingComponents).toContain("Tenant/store scope mismatch in True Cost inputs");
+    }
+  });
   it("excludes cancelled orders", () => expect(calculate({ order: { ...order, status: "cancelled" } }).status).toBe("no_data"));
   it("does not claim correctness for refunded orders without a reversal policy", () => expect(calculate({ order: { ...order, status: "partially_refunded", refundedAmount: money(100) } }).status).toBe("incomplete"));
   it("rounds basis-point fees to minor units", () => { const result = calculate({ order: { ...order, merchandiseGross: money(101), discounts: money(0), shippingCharged: money(0) }, rules: coreRules.map(rule => rule.id === "payment" ? { ...rule, fixedFee: money(0) } : rule) }); expect(result.paymentFees).toBe(3); });

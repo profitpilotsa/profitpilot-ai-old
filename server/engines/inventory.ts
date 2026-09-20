@@ -12,6 +12,7 @@ const metric = (value: number | undefined, status: OperationalStatus, missingInp
 const isNonNegativeFinite = (value: number | undefined): value is number => value !== undefined && Number.isFinite(value) && value >= 0;
 const isPositiveFinite = (value: number | undefined): value is number => value !== undefined && Number.isFinite(value) && value > 0;
 const isValidMinorUnit = (value: MinorUnit | undefined): value is MinorUnit => value !== undefined && Number.isSafeInteger(value) && value >= 0;
+const sharesScope = (scope: DataScope, record: DataScope) => record.organizationId === scope.organizationId && record.storeId === scope.storeId;
 
 export function calculateSalesVelocity(sales?: SalesHistory): Metric {
   if (sales?.unitsSold === undefined || sales.periodDays === undefined) return metric(undefined, "no_data", ["Sales history and a positive period are required"]);
@@ -35,6 +36,7 @@ export function estimateStockoutAt(coverage: Metric, asOf: string): { value?: st
 }
 
 export function calculateReorderRecommendation(input: InventoryRecommendationInput): ReorderRecommendation {
+  if ([input.inventory, input.sales, input.supplierProduct, input.configuration].some(record => record !== undefined && !sharesScope(input.scope, record))) return { ...input.scope, productId: input.productId, variantId: input.variantId, status: "incomplete", missingInputs: ["Tenant/store scope mismatch in inventory inputs"], explanations: ["Inventory inputs must belong to the requested organization and store"], source: input.source ?? "calculated", calculatedAt: input.calculatedAt };
   const availableStock = input.inventory?.availableStock ?? input.inventory?.currentStock;
   const velocity = calculateSalesVelocity(input.sales);
   const coverage = calculateStockCoverage(availableStock, velocity);

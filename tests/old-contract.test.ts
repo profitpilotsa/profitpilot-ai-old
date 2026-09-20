@@ -37,4 +37,10 @@ describe("OLD visual and interaction contract", () => {
   it("binds OLD Marketing Overview to structured Step 3 campaign data", () => {
     for (const item of ['campaignModel.spend', 'campaignModel.revenue', 'campaignModel.trueProfit', 'campaignModel.margin', 'campaignModel.roas', 'campaignModel.cac', 'campaignModel.advertisingCostTreatment']) expect(home).toContain(item);
   });
+  it("labels current workspace data and export behavior as demo-only", () => {
+    expect(home).toContain("Demo workspace · sample data");
+    expect(home).toContain("Demo preview only — report export is not available yet.");
+    expect(home).not.toContain("All systems synced · 2 min ago");
+    expect(home).not.toContain("Export prepared: product-true-profit-sep-2026.csv");
+  });
 });

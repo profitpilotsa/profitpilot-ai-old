@@ -23,6 +23,12 @@ describe("inventory and cash-aware engines", () => {
     expect(result.reorderQuantity).toBe(27);
     expect(result.explanations.join(" ")).toContain("not treated as a case-pack multiple");
   });
+  it("rejects organization or store mismatches instead of producing a reorder recommendation", () => {
+    for (const inventory of [{ ...pima(), organizationId: "org-b" }, { ...pima(), storeId: "store-b" }]) {
+      const result = calculateReorderRecommendation({ scope, productId: "pima", inventory: { ...scope, id: "inventory", productId: "pima", currentStock: 85, source: "demo", status: "actual", observedAt: "2026-09-19T00:00:00Z", organizationId: inventory.organizationId, storeId: inventory.storeId }, calculatedAt: "2026-09-19T00:00:00Z" });
+      expect(result.status).toBe("incomplete"); expect(result.reorderQuantity).toBeUndefined(); expect(result.missingInputs).toContain("Tenant/store scope mismatch in inventory inputs");
+    }
+  });
   it("propagates invalid inventory and supplier values as incomplete", () => {
     const invalidStock = calculateStockCoverage(-1, { value: 2, status: "actual", missingInputs: [] });
     expect(invalidStock.status).toBe("incomplete"); expect(invalidStock.value).toBeUndefined();
