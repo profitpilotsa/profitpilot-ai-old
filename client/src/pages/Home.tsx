@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { demoCostConfigurations, demoProductProfitability } from "@/application/trueCostAdapter";
 import { demoCashAwareDecision, demoInventoryDisplays, demoOrderDisplay } from "@/application/inventoryAdapter";
+import { demoCampaignDisplay, demoCashFlowDisplay, demoCustomerDisplay } from "@/application/customerMarketingAdapter";
 import { CostSemanticPanel } from "@/components/CostSemanticPanel";
 import {
   Activity,
@@ -64,6 +65,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { label: "Product Profitability", href: "/products", icon: BarChart3 },
       { label: "Inventory Intelligence", href: "/inventory", icon: Package },
       { label: "Cash-Aware Decision", href: "/cash", icon: CircleDollarSign },
+      { label: "Customers", href: "/customers", icon: UserRound },
       { label: "True Cost Engine", href: "/true-cost", icon: Database },
     ],
   },
@@ -107,6 +109,9 @@ const products = profitabilityModels.map((product, index) => {
 });
 const costBreakdown = profitabilityModels[0].components.map((cost) => ({ label: cost.label, value: cost.amount.display, source: cost.status === "not_configured" ? "Not configured" : cost.source[0].toUpperCase() + cost.source.slice(1), tone: cost.status === "incomplete" || cost.status === "not_configured" ? "amber" : cost.status === "estimated" ? "amber" : "teal" }));
 const costConfigurationModels = demoCostConfigurations();
+const customerModel = demoCustomerDisplay();
+const campaignModel = demoCampaignDisplay();
+const cashFlowModel = demoCashFlowDisplay();
 
 const initialActions = [
   { id: 1, title: "Review Pima reorder", subtitle: "Stockout in 9 days • recommended quantity 200", icon: Package, tone: "red", primary: "Review" },
@@ -325,6 +330,8 @@ const marketingPlatforms = [
   { name: "Snapchat Ads", account: "Not connected", spend: "—", status: "Requires Integration", source: "Requires API", tone: "amber", lastSync: "—", revenue: "—", orders: "—", cac: "—", roas: "—", profit: "—" },
 ];
 
+function CustomerIntelligence() { return <><PageHeader eyebrow="Intelligence · Customers" title="Customer Profitability" subtitle="Observed value uses completed True Cost results; it is not a predicted LTV." action={<button className="button primary" onClick={() => toast("Customer export prepared for this demo session.")}><FileText size={14} /> Export customers</button>} /><div className="grid grid-4" style={{ marginBottom: 15 }}><StatCard label="Customer" value={customerModel.name} delta={customerModel.status} icon={UserRound} /><StatCard label="Observed true profit" value={customerModel.trueProfit} delta="Historical, not forecast LTV" icon={CircleDollarSign} /><StatCard label="Orders" value={String(customerModel.orders)} delta={customerModel.segments} icon={ShoppingCart} /><StatCard label="Average order value" value={customerModel.aov} delta="Demo customer data" icon={BarChart3} /></div><div className="grid grid-main"><div className="panel panel-accent panel-pad"><div className="section-head"><div><h2>{customerModel.name}</h2><p>Customer value is calculated from scoped orders and completed True Cost data.</p></div><span className="tag violet">{customerModel.status}</span></div><div className="metric-row"><span>Historical revenue</span><strong>{customerModel.revenue}</strong></div><div className="metric-row"><span>Observed customer value</span><strong className="good">{customerModel.trueProfit}</strong></div><div className="metric-row"><span>Segments</span><strong>{customerModel.segments || "No data"}</strong></div></div><div className="panel panel-pad"><div className="section-head"><div><h2>Decision context</h2><p>Marketing and cash remain separate from customer value.</p></div><Lightbulb size={17} color="#f1bb65" /></div><div className="metric-row"><span>Campaign CAC</span><strong>{campaignModel.cac}</strong></div><div className="metric-row"><span>Projected cash</span><strong className="warn">{cashFlowModel.projected}</strong></div><div className="metric-row"><span>Data quality</span><strong>{customerModel.missing.length ? customerModel.missing.join(" · ") : "Demo / estimated"}</strong></div></div></div></>; }
+
 function MarketingHub({ initialTab = "overview" }: { initialTab?: string }) {
   const navigate = useAppNavigation();
   const [tab, setTab] = useState(initialTab);
@@ -350,7 +357,7 @@ export default function Home() {
   const [location] = useLocation();
   const path = useMemo(() => location.split("?")[0] || "/", [location]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const Screen = path === "/" ? Dashboard : path === "/decisions" ? DecisionCenter : path === "/products" ? ProductProfitability : path === "/inventory" ? InventoryIntelligence : path === "/cash" ? CashAwareDecision : path === "/true-cost" ? TrueCostEngine : path === "/costs" ? CostOverview : path === "/cost-settings" ? CostSettings : path === "/shipping-costs" ? () => <ManagementTable type="shipping" /> : path === "/payment-fees" ? () => <ManagementTable type="payment" /> : path === "/packaging-costs" ? () => <ManagementTable type="packaging" /> : path === "/advertising-costs" ? () => <ManagementTable type="advertising" /> : path === "/subscriptions" ? Subscriptions : path === "/other-costs" ? () => <ManagementTable type="other" /> : path === "/marketing" ? () => <MarketingHub initialTab="overview" /> : path === "/marketing/platforms" ? () => <MarketingHub initialTab="platforms" /> : path === "/marketing/campaigns" ? () => <MarketingHub initialTab="campaigns" /> : path === "/marketing/tracking" ? () => <MarketingHub initialTab="tracking" /> : path === "/brain" ? BusinessBrain : path === "/analyst" ? AIAnalyst : path === "/actions" ? ActionCenter : NotFoundScreen;
+  const Screen = path === "/" ? Dashboard : path === "/decisions" ? DecisionCenter : path === "/products" ? ProductProfitability : path === "/inventory" ? InventoryIntelligence : path === "/cash" ? CashAwareDecision : path === "/customers" ? CustomerIntelligence : path === "/true-cost" ? TrueCostEngine : path === "/costs" ? CostOverview : path === "/cost-settings" ? CostSettings : path === "/shipping-costs" ? () => <ManagementTable type="shipping" /> : path === "/payment-fees" ? () => <ManagementTable type="payment" /> : path === "/packaging-costs" ? () => <ManagementTable type="packaging" /> : path === "/advertising-costs" ? () => <ManagementTable type="advertising" /> : path === "/subscriptions" ? Subscriptions : path === "/other-costs" ? () => <ManagementTable type="other" /> : path === "/marketing" ? () => <MarketingHub initialTab="overview" /> : path === "/marketing/platforms" ? () => <MarketingHub initialTab="platforms" /> : path === "/marketing/campaigns" ? () => <MarketingHub initialTab="campaigns" /> : path === "/marketing/tracking" ? () => <MarketingHub initialTab="tracking" /> : path === "/brain" ? BusinessBrain : path === "/analyst" ? AIAnalyst : path === "/actions" ? ActionCenter : NotFoundScreen;
 
   return <div className="app-shell"><Sidebar path={path} open={sidebarOpen} onClose={() => setSidebarOpen(false)} /><main className="main"><Topbar path={path} onMenu={() => setSidebarOpen(true)} /><Screen /></main></div>;
 }

@@ -30,4 +30,8 @@ describe("OLD visual and interaction contract", () => {
     expect(home).toContain("Demo decision marked for review; it is not persisted or executed.");
     expect(home).not.toContain("Phase2BStep2Experience");
   });
+  it("adds customer data inside the existing route shell without a Step 3 replacement experience", () => {
+    for (const item of ['href: "/customers"', 'function CustomerIntelligence()', 'demoCustomerDisplay()', 'demoCampaignDisplay()', 'demoCashFlowDisplay()']) expect(home).toContain(item);
+    expect(home).not.toContain("Step3Experience");
+  });
 });
