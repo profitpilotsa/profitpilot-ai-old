@@ -71,6 +71,11 @@ export function demoProductProfitability(): ProductProfitabilityView[] {
   return [adaptTrueCostResult(golden, { id: "pima", name: "IRONCLAD Pima T-Shirt", sku: "PMA-001", inventory: { stock: 85, coverage: "10 days", signal: "At risk", tone: "bad" } }), adaptTrueCostResult(complete, { id: "spandex", name: "IRONCLAD Spandex T-Shirt", sku: "SPX-014", inventory: { stock: 142, coverage: "24 days", signal: "Margin down", tone: "warn" } }), unavailableProduct, adaptTrueCostResult(missingShipping, { id: "socks", name: "Studio Socks Set", sku: "STS-022", inventory: { stock: 210, coverage: "37 days", signal: "Incomplete cost data", tone: "warn" } })];
 }
 
+/** UI-facing read boundary; live data can replace the demo implementation later. */
+export function getProductProfitabilityDisplay(): ProductProfitabilityView[] {
+  return demoProductProfitability();
+}
+
 export function demoCostConfigurations(): CostConfigurationView[] {
   const configs: Array<Omit<CostConfigurationView, "amount" | "fixedFee"> & { amount?: MinorUnit; fixedFee?: MinorUnit }> = [
     { id: "product-pima", category: "product_cost", name: "Pima / Black M", scope: "variant", calculation: "per_unit", recurrence: "per_unit", source: "imported", status: "actual", enabled: true, effectiveFrom: "2026-01-01", amount: money(4200) },

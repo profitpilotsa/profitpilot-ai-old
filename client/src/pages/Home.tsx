@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast as showToast } from "sonner";
-import { demoCostConfigurations, demoProductProfitability } from "@/application/trueCostAdapter";
+import { demoCostConfigurations, getProductProfitabilityDisplay } from "@/application/trueCostAdapter";
 import { demoCashAwareDecision, demoInventoryDisplays, demoOrderDisplay } from "@/application/inventoryAdapter";
 import { demoCampaignDisplay, demoCashFlowDisplay, demoCustomerDisplay } from "@/application/customerMarketingAdapter";
 import { CostSemanticPanel } from "@/components/CostSemanticPanel";
@@ -111,7 +111,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
 const inventoryModels = demoInventoryDisplays();
 const inventoryByProduct = new Map(inventoryModels.map((item) => [item.productId, item]));
 const orderModel = demoOrderDisplay();
-const profitabilityModels = demoProductProfitability();
+const profitabilityModels = getProductProfitabilityDisplay();
 const products = profitabilityModels.map((product, index) => {
   const inventory = inventoryByProduct.get(product.id); const unavailable = inventory?.status === "no_data" || product.status === "no_data";
   return { name: product.name, code: product.sku, revenue: product.revenue.display, profit: product.trueProfit.display, margin: product.margin, trend: ["+18%", "-9%", "+4%", "+12%"][index], stock: String(inventory?.stock ?? product.inventory?.stock ?? "—"), coverage: inventory?.coverage ?? product.inventory?.coverage ?? "No data", status: inventory?.signal ?? product.inventory?.signal ?? product.status, tone: unavailable ? "violet" : product.status === "incomplete" || inventory?.status === "incomplete" ? "amber" : inventory?.tone ?? (product.inventory?.tone === "bad" ? "red" : "teal"), toneClass: unavailable || product.status === "incomplete" || inventory?.status === "incomplete" ? "warn" : "good", units: ["200", "140", "70", "60"][index], trueCost: product.trueCost.display, productCost: product.components.find((cost) => cost.key === "productCost")?.amount.display ?? "Incomplete — not configured", shipping: product.components.find((cost) => cost.key === "shipping")?.amount.display ?? "Incomplete — not configured", packaging: product.components.find((cost) => cost.key === "packaging")?.amount.display ?? "Incomplete — not configured", payment: product.components.find((cost) => cost.key === "paymentFees")?.amount.display ?? "Incomplete — not configured", ads: product.components.find((cost) => cost.key === "advertisingAllocation")?.amount.display ?? "Incomplete — not configured", subscriptions: product.components.find((cost) => cost.key === "subscriptionAllocation")?.amount.display ?? "Incomplete — not configured", other: product.components.find((cost) => cost.key === "otherCosts")?.amount.display ?? "Incomplete — not configured", velocity: inventory?.velocity ?? "No data", reorder: inventory?.reorderQuantity ?? "Incomplete", supplier: inventory?.supplierName ?? "Not configured" };
