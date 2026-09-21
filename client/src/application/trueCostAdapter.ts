@@ -39,6 +39,15 @@ export function adaptTrueCostResult(result: TrueCostResult, product: Pick<Produc
   return { ...product, revenue: presentMoney(result.revenue), discounts: presentMoney(result.discounts), trueCost: presentMoney(result.trueCost), grossProfit: presentMoney(result.grossProfit ?? undefined), trueProfit: presentMoney(result.trueProfit ?? undefined), margin: result.marginBps === null ? "—" : `${(result.marginBps / 100).toFixed(1)}%`, status: result.status, missingComponents: result.missingComponents, estimatedComponents: result.estimatedComponents, sources: Array.from(result.sources, source), calculatedAt: result.calculatedAt, version: result.version, components };
 }
 
+export interface ProductProfitabilityTransformationInput {
+  result: TrueCostResult;
+  product: Pick<ProductProfitabilityView, "id" | "name" | "sku" | "inventory">;
+}
+
+export function transformProductProfitability(inputs: readonly ProductProfitabilityTransformationInput[]): ProductProfitabilityView[] {
+  return inputs.map(({ result, product }) => adaptTrueCostResult(result, product));
+}
+
 const scope = { organizationId: "demo-profitpilot", storeId: "demo-store", mode: "demo" as const };
 const asRule = (id: string, category: CostCategory, values: Partial<CostRule>): CostRule => ({ ...scope, id, category, scope: "store", name: id, calculation: "fixed", source: "demo", status: "actual", effectiveFrom: "2026-01-01T00:00:00Z", ...values });
 const baseRules: CostRule[] = [
@@ -68,7 +77,12 @@ export function demoProductProfitability(): ProductProfitabilityView[] {
     revenue: noData(), discounts: noData(), trueCost: noData(), grossProfit: noData(), trueProfit: noData(), margin: "—", status: "no_data", missingComponents: ["No engine-backed order or cost data"], estimatedComponents: [], sources: ["demo"], calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo",
     components: componentNames.map(([key, label]) => ({ key, label, amount: noData(), status: "no_data", source: "demo", calculation: "not configured", missing: true })),
   };
-  return [adaptTrueCostResult(golden, { id: "pima", name: "IRONCLAD Pima T-Shirt", sku: "PMA-001", inventory: { stock: 85, coverage: "10 days", signal: "At risk", tone: "bad" } }), adaptTrueCostResult(complete, { id: "spandex", name: "IRONCLAD Spandex T-Shirt", sku: "SPX-014", inventory: { stock: 142, coverage: "24 days", signal: "Margin down", tone: "warn" } }), unavailableProduct, adaptTrueCostResult(missingShipping, { id: "socks", name: "Studio Socks Set", sku: "STS-022", inventory: { stock: 210, coverage: "37 days", signal: "Incomplete cost data", tone: "warn" } })];
+  const calculatedProducts = transformProductProfitability([
+    { result: golden, product: { id: "pima", name: "IRONCLAD Pima T-Shirt", sku: "PMA-001", inventory: { stock: 85, coverage: "10 days", signal: "At risk", tone: "bad" } } },
+    { result: complete, product: { id: "spandex", name: "IRONCLAD Spandex T-Shirt", sku: "SPX-014", inventory: { stock: 142, coverage: "24 days", signal: "Margin down", tone: "warn" } } },
+    { result: missingShipping, product: { id: "socks", name: "Studio Socks Set", sku: "STS-022", inventory: { stock: 210, coverage: "37 days", signal: "Incomplete cost data", tone: "warn" } } },
+  ]);
+  return [calculatedProducts[0], calculatedProducts[1], unavailableProduct, calculatedProducts[2]];
 }
 
 /** UI-facing read boundary; live data can replace the demo implementation later. */
