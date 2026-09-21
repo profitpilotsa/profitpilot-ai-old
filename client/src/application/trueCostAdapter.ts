@@ -1,61 +1,15 @@
 import { money, type MinorUnit } from "../../../server/domain/money";
 import type { CostCategory, CostRule, Order, OrderItem } from "../../../server/domain/commerce";
-import { calculateTrueCost, type FinancialStatus, type TrueCostInput, type TrueCostResult } from "../../../server/engines/trueCost";
+import { calculateProductProfitabilityDisplay, presentMoney, productProfitabilityComponentNames, type CostDisplayStatus, type CostSource, type MoneyView, type ProductProfitabilityCalculationInput, type ProductProfitabilityView } from "@shared/productProfitability";
 
-export type CostDisplayStatus = FinancialStatus | "not_configured";
-export type CostSource = "automatic" | "imported" | "manual" | "estimated" | "calculated" | "demo";
+export { adaptTrueCostResult, calculateProductProfitabilityDisplay, presentMoney, productProfitabilityComponentNames, transformProductProfitability, type CostComponentView, type CostDisplayStatus, type CostSource, type MoneyView, type ProductProfitabilityCalculationInput, type ProductProfitabilityTransformationInput, type ProductProfitabilityView } from "@shared/productProfitability";
 export type CostRecurrence = "one_time" | "per_order" | "per_unit" | "daily" | "weekly" | "monthly" | "yearly" | "period_allocation";
-
-export interface MoneyView { minorUnits?: MinorUnit; display: string; unavailable: boolean; }
-export interface CostComponentView {
-  key: string; label: string; amount: MoneyView; status: CostDisplayStatus; source: CostSource; calculation: string; missing?: boolean;
-}
-export interface ProductProfitabilityView {
-  id: string; name: string; sku: string; inventory?: { stock: number; coverage: string; signal: string; tone: "good" | "warn" | "bad" };
-  revenue: MoneyView; discounts: MoneyView; trueCost: MoneyView; grossProfit: MoneyView; trueProfit: MoneyView; margin: string;
-  status: FinancialStatus; missingComponents: string[]; estimatedComponents: string[]; sources: CostSource[]; calculatedAt: string; version: string; components: CostComponentView[];
-}
 export interface CostConfigurationView {
   id: string; category: CostCategory; name: string; scope: "store" | "product" | "variant" | "order" | "campaign";
   calculation: "fixed" | "per_order" | "per_product" | "per_unit" | "percentage" | "imported" | "calculated";
   recurrence: CostRecurrence; source: CostSource; status: CostDisplayStatus; enabled: boolean; effectiveFrom: string; amount: MoneyView; percentageBps?: number; fixedFee?: MoneyView; notes?: string;
 }
 
-const sar = new Intl.NumberFormat("en-SA", { style: "currency", currency: "SAR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export const presentMoney = (value?: MinorUnit): MoneyView => value === undefined ? { display: "Incomplete — not configured", unavailable: true } : { minorUnits: value, display: sar.format(value / 100), unavailable: false };
-const source = (value: string): CostSource => value === "platform" ? "automatic" : value as CostSource;
-const componentNames: Array<[keyof Pick<TrueCostResult, "productCost" | "shipping" | "customs" | "packaging" | "paymentFees" | "advertisingAllocation" | "subscriptionAllocation" | "otherCosts">, string, string]> = [
-  ["productCost", "Product cost", "Product cost"], ["shipping", "Shipping", "Shipping"], ["customs", "Customs / import", "Customs / import"], ["packaging", "Packaging", "Packaging"], ["paymentFees", "Payment fee", "Payment fees"], ["advertisingAllocation", "Advertising allocation", "Advertising allocation"], ["subscriptionAllocation", "Subscription allocation", "Subscription allocation"], ["otherCosts", "Other costs", "Other costs"],
-];
-
-export function adaptTrueCostResult(result: TrueCostResult, product: Pick<ProductProfitabilityView, "id" | "name" | "sku" | "inventory">): ProductProfitabilityView {
-  const missing = new Set(result.missingComponents);
-  const components = componentNames.map(([key, label, missingLabel]) => {
-    const breakdown = result.breakdown.find((item) => item.category === ({ productCost: "product_cost", shipping: "shipping", customs: "customs", packaging: "packaging", paymentFees: "payment_fee", advertisingAllocation: "advertising", subscriptionAllocation: "subscription", otherCosts: "other" } as Record<string, string>)[key]);
-    // Phase 2A exposes missing component names, not category IDs; match its canonical labels exactly.
-    const missingComponent = missing.has(missingLabel);
-    return { key, label, amount: presentMoney(missingComponent ? undefined : result[key]), status: (missingComponent ? "incomplete" : breakdown?.status ?? "not_configured") as CostDisplayStatus, source: source(breakdown?.source ?? "manual"), calculation: breakdown?.method ?? "not configured", missing: missingComponent };
-  });
-  return { ...product, revenue: presentMoney(result.revenue), discounts: presentMoney(result.discounts), trueCost: presentMoney(result.trueCost), grossProfit: presentMoney(result.grossProfit ?? undefined), trueProfit: presentMoney(result.trueProfit ?? undefined), margin: result.marginBps === null ? "—" : `${(result.marginBps / 100).toFixed(1)}%`, status: result.status, missingComponents: result.missingComponents, estimatedComponents: result.estimatedComponents, sources: Array.from(result.sources, source), calculatedAt: result.calculatedAt, version: result.version, components };
-}
-
-export interface ProductProfitabilityTransformationInput {
-  result: TrueCostResult;
-  product: Pick<ProductProfitabilityView, "id" | "name" | "sku" | "inventory">;
-}
-
-export function transformProductProfitability(inputs: readonly ProductProfitabilityTransformationInput[]): ProductProfitabilityView[] {
-  return inputs.map(({ result, product }) => adaptTrueCostResult(result, product));
-}
-
-export interface ProductProfitabilityCalculationInput {
-  trueCost: TrueCostInput;
-  product: Pick<ProductProfitabilityView, "id" | "name" | "sku" | "inventory">;
-}
-
-export function calculateProductProfitabilityDisplay(inputs: readonly ProductProfitabilityCalculationInput[]): ProductProfitabilityView[] {
-  return transformProductProfitability(inputs.map(({ trueCost, product }) => ({ result: calculateTrueCost(trueCost), product })));
-}
 
 interface ProductProfitabilityDemoSource {
   calculationInputs: readonly ProductProfitabilityCalculationInput[];
@@ -86,7 +40,7 @@ function demoProductProfitabilitySource(): ProductProfitabilityDemoSource {
   const unavailableProduct: ProductProfitabilityView = {
     id: "burgundy", name: "Burgundy Overshirt", sku: "BRG-008", inventory: { stock: 490, coverage: "61 days", signal: "No True Cost data", tone: "warn" },
     revenue: noData(), discounts: noData(), trueCost: noData(), grossProfit: noData(), trueProfit: noData(), margin: "—", status: "no_data", missingComponents: ["No engine-backed order or cost data"], estimatedComponents: [], sources: ["demo"], calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo",
-    components: componentNames.map(([key, label]) => ({ key, label, amount: noData(), status: "no_data", source: "demo", calculation: "not configured", missing: true })),
+    components: productProfitabilityComponentNames.map(([key, label]) => ({ key, label, amount: noData(), status: "no_data", source: "demo", calculation: "not configured", missing: true })),
   };
   return { unavailableProduct, calculationInputs: [
     { trueCost: { order: goldenOrder, items: goldenItems, rules: goldenRules, calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" }, product: { id: "pima", name: "IRONCLAD Pima T-Shirt", sku: "PMA-001", inventory: { stock: 85, coverage: "10 days", signal: "At risk", tone: "bad" } } },
