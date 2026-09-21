@@ -12,7 +12,8 @@ export interface TrueCostResult {
   breakdown: Component[]; calculatedAt: string; version: string; handling: { cancelled: "excluded" | "not_applicable"; refunds: "none" | "requires_policy" };
 }
 
-const isEffective = (rule: CostRule, at: string) => rule.effectiveFrom <= at && (!rule.effectiveTo || rule.effectiveTo > at) && rule.status !== "not_configured";
+export const isEffectiveCostRule = (rule: CostRule, at: string) => rule.effectiveFrom <= at && (!rule.effectiveTo || rule.effectiveTo > at) && rule.status !== "not_configured";
+export const isApplicableCostRule = (rule: CostRule, order: Order, items: readonly OrderItem[]) => rule.scope === "store" || rule.scope === "order" || (rule.scope === "product" && items.some(item => item.productId === rule.targetId)) || (rule.scope === "variant" && items.some(item => item.variantId === rule.targetId));
 const categoryLabel: Record<CostCategory, string> = { product_cost: "Product cost", shipping: "Shipping", customs: "Customs / import", packaging: "Packaging", payment_fee: "Payment fees", advertising: "Advertising allocation", subscription: "Subscription allocation", other: "Other costs" };
 const categoryStatus = (rule: CostRule): FinancialStatus => rule.status === "actual" ? "actual" : rule.status === "estimated" ? "estimated" : "incomplete";
 const sharesOrderScope = (order: Order, record: { organizationId: string; storeId?: string }) => record.organizationId === order.organizationId && record.storeId === order.storeId;
@@ -40,10 +41,10 @@ export function calculateTrueCost(input: TrueCostInput): TrueCostResult {
   ];
   const missing = new Set<string>(); const estimated = new Set<string>(); const sources = new Set<string>([order.source]);
   const totals: Record<CostCategory, MinorUnit> = { product_cost: zeroMoney, shipping: zeroMoney, customs: zeroMoney, packaging: zeroMoney, payment_fee: zeroMoney, advertising: zeroMoney, subscription: zeroMoney, other: zeroMoney };
-  const rules = input.rules.filter(rule => isEffective(rule, order.orderedAt));
+  const rules = input.rules.filter(rule => isEffectiveCostRule(rule, order.orderedAt));
   const essential = new Set<CostCategory>(["product_cost", "shipping", "payment_fee"]);
   for (const category of Object.keys(totals) as CostCategory[]) {
-    const candidates = rules.filter(rule => rule.category === category && (rule.scope === "store" || rule.scope === "order" || (rule.scope === "product" && items.some(item => item.productId === rule.targetId)) || (rule.scope === "variant" && items.some(item => item.variantId === rule.targetId))));
+    const candidates = rules.filter(rule => rule.category === category && isApplicableCostRule(rule, order, items));
     const allocations = (input.allocations ?? []).filter(a => a.orderId === order.id && rules.some(rule => rule.id === a.costRuleId && rule.category === category));
     if (candidates.length === 0 && allocations.length === 0) { if (essential.has(category)) missing.add(categoryLabel[category]); continue; }
     for (const rule of candidates) {
