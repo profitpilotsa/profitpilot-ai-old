@@ -1,6 +1,6 @@
 import { money, type MinorUnit } from "../../../server/domain/money";
 import type { CostCategory, CostRule, Order, OrderItem } from "../../../server/domain/commerce";
-import { calculateTrueCost, type FinancialStatus, type TrueCostResult } from "../../../server/engines/trueCost";
+import { calculateTrueCost, type FinancialStatus, type TrueCostInput, type TrueCostResult } from "../../../server/engines/trueCost";
 
 export type CostDisplayStatus = FinancialStatus | "not_configured";
 export type CostSource = "automatic" | "imported" | "manual" | "estimated" | "calculated" | "demo";
@@ -48,6 +48,15 @@ export function transformProductProfitability(inputs: readonly ProductProfitabil
   return inputs.map(({ result, product }) => adaptTrueCostResult(result, product));
 }
 
+export interface ProductProfitabilityCalculationInput {
+  trueCost: TrueCostInput;
+  product: Pick<ProductProfitabilityView, "id" | "name" | "sku" | "inventory">;
+}
+
+export function calculateProductProfitabilityDisplay(inputs: readonly ProductProfitabilityCalculationInput[]): ProductProfitabilityView[] {
+  return transformProductProfitability(inputs.map(({ trueCost, product }) => ({ result: calculateTrueCost(trueCost), product })));
+}
+
 const scope = { organizationId: "demo-profitpilot", storeId: "demo-store", mode: "demo" as const };
 const asRule = (id: string, category: CostCategory, values: Partial<CostRule>): CostRule => ({ ...scope, id, category, scope: "store", name: id, calculation: "fixed", source: "demo", status: "actual", effectiveFrom: "2026-01-01T00:00:00Z", ...values });
 const baseRules: CostRule[] = [
@@ -68,19 +77,16 @@ const goldenOrder: Order = { ...scope, id: "order-golden", source: "demo", statu
 const goldenItems: OrderItem[] = [{ ...scope, id: "line-golden", orderId: goldenOrder.id, productId: "pima", variantId: "pima-black-m", source: "demo", title: "IRONCLAD Pima T-Shirt", quantity: 2, returnedQuantity: 0, unitGross: money(5000), discountAmount: money(1000) }];
 
 export function demoProductProfitability(): ProductProfitabilityView[] {
-  const golden = calculateTrueCost({ order: goldenOrder, items: goldenItems, rules: goldenRules, calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" });
-  const complete = calculateTrueCost({ order: { ...goldenOrder, id: "order-spandex", merchandiseGross: money(19600), discounts: money(800), shippingCharged: money(800) }, items: [{ ...goldenItems[0], id: "line-spandex", orderId: "order-spandex", productId: "spandex", variantId: "spandex-black-m", title: "IRONCLAD Spandex T-Shirt", quantity: 4 }], rules: baseRules.map((rule) => rule.id === "product-pima" ? { ...rule, id: "product-spandex", targetId: "spandex-black-m", amount: money(3100) } : rule), calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" });
-  const missingShipping = calculateTrueCost({ order: { ...goldenOrder, id: "order-socks", merchandiseGross: money(9480), discounts: money(0), shippingCharged: money(0) }, items: [{ ...goldenItems[0], id: "line-socks", orderId: "order-socks", productId: "socks", variantId: "socks-set", title: "Studio Socks Set", quantity: 3 }], rules: baseRules.filter((rule) => rule.category !== "shipping").map((rule) => rule.id === "product-pima" ? { ...rule, id: "product-socks", targetId: "socks-set", amount: money(700) } : rule), calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" });
   const noData = (): MoneyView => ({ display: "No data", unavailable: true });
   const unavailableProduct: ProductProfitabilityView = {
     id: "burgundy", name: "Burgundy Overshirt", sku: "BRG-008", inventory: { stock: 490, coverage: "61 days", signal: "No True Cost data", tone: "warn" },
     revenue: noData(), discounts: noData(), trueCost: noData(), grossProfit: noData(), trueProfit: noData(), margin: "—", status: "no_data", missingComponents: ["No engine-backed order or cost data"], estimatedComponents: [], sources: ["demo"], calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo",
     components: componentNames.map(([key, label]) => ({ key, label, amount: noData(), status: "no_data", source: "demo", calculation: "not configured", missing: true })),
   };
-  const calculatedProducts = transformProductProfitability([
-    { result: golden, product: { id: "pima", name: "IRONCLAD Pima T-Shirt", sku: "PMA-001", inventory: { stock: 85, coverage: "10 days", signal: "At risk", tone: "bad" } } },
-    { result: complete, product: { id: "spandex", name: "IRONCLAD Spandex T-Shirt", sku: "SPX-014", inventory: { stock: 142, coverage: "24 days", signal: "Margin down", tone: "warn" } } },
-    { result: missingShipping, product: { id: "socks", name: "Studio Socks Set", sku: "STS-022", inventory: { stock: 210, coverage: "37 days", signal: "Incomplete cost data", tone: "warn" } } },
+  const calculatedProducts = calculateProductProfitabilityDisplay([
+    { trueCost: { order: goldenOrder, items: goldenItems, rules: goldenRules, calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" }, product: { id: "pima", name: "IRONCLAD Pima T-Shirt", sku: "PMA-001", inventory: { stock: 85, coverage: "10 days", signal: "At risk", tone: "bad" } } },
+    { trueCost: { order: { ...goldenOrder, id: "order-spandex", merchandiseGross: money(19600), discounts: money(800), shippingCharged: money(800) }, items: [{ ...goldenItems[0], id: "line-spandex", orderId: "order-spandex", productId: "spandex", variantId: "spandex-black-m", title: "IRONCLAD Spandex T-Shirt", quantity: 4 }], rules: baseRules.map((rule) => rule.id === "product-pima" ? { ...rule, id: "product-spandex", targetId: "spandex-black-m", amount: money(3100) } : rule), calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" }, product: { id: "spandex", name: "IRONCLAD Spandex T-Shirt", sku: "SPX-014", inventory: { stock: 142, coverage: "24 days", signal: "Margin down", tone: "warn" } } },
+    { trueCost: { order: { ...goldenOrder, id: "order-socks", merchandiseGross: money(9480), discounts: money(0), shippingCharged: money(0) }, items: [{ ...goldenItems[0], id: "line-socks", orderId: "order-socks", productId: "socks", variantId: "socks-set", title: "Studio Socks Set", quantity: 3 }], rules: baseRules.filter((rule) => rule.category !== "shipping").map((rule) => rule.id === "product-pima" ? { ...rule, id: "product-socks", targetId: "socks-set", amount: money(700) } : rule), calculatedAt: "2026-02-01T00:00:00Z", version: "2A.1-demo" }, product: { id: "socks", name: "Studio Socks Set", sku: "STS-022", inventory: { stock: 210, coverage: "37 days", signal: "Incomplete cost data", tone: "warn" } } },
   ]);
   return [calculatedProducts[0], calculatedProducts[1], unavailableProduct, calculatedProducts[2]];
 }
