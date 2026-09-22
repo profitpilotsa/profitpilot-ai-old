@@ -12,15 +12,15 @@ const rule = (overrides: Partial<CostRule> = {}): CostRule => ({ ...scope, id: "
 const evaluate = (overrides: Partial<Parameters<typeof evaluateProductProfitabilityOrder>[0]> = {}) => evaluateProductProfitabilityOrder({ scope, platform: "salla", order: order(), items: [item()], products: [product("product-a")], variants: [] as Variant[], rules: [] as CostRule[], allocations: [] as CostAllocation[], calculatedAt: "2026-09-21T00:00:00.000Z", ...overrides });
 
 describe("Product Profitability per-Order evaluation", () => {
-  it("evaluates a safe paid Order once through True Cost with caller-supplied time", () => {
-    const result = evaluate();
+  it("evaluates a safe paid Order through the V1 cost-policy wrapper with caller-supplied time", () => {
+    const result = evaluate({ rules: [rule()] });
     expect(result).toMatchObject({ classification: "eligible", productId: "product-a", orderId: "order" });
     if (result.classification !== "eligible") throw new Error("Expected eligible evaluation");
     expect(result.trueCost.calculatedAt).toBe("2026-09-21T00:00:00.000Z");
-    expect(result.trueCost.status).toBe("incomplete");
+    expect(result.trueCost).toMatchObject({ status: "actual", directCost: money(100), directProfit: money(925) });
   });
 
-  it("preserves fulfilled eligibility and an unchanged incomplete True Cost result", () => {
+  it("preserves fulfilled eligibility and V1 incomplete direct-cost semantics", () => {
     const result = evaluate({ order: order({ status: "fulfilled" }) });
     expect(result).toMatchObject({ classification: "eligible" });
     if (result.classification !== "eligible") throw new Error("Expected eligible evaluation");

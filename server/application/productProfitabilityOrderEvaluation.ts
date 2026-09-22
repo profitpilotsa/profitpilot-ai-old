@@ -1,8 +1,8 @@
 import type { Order } from "../domain/commerce";
 import type { MinorUnit } from "../domain/money";
 import type { Id } from "../domain/tenant";
-import { calculateTrueCost, type TrueCostResult } from "../engines/trueCost";
 import { classifyProductProfitabilityOrder, type ProductProfitabilityEligibility, type ProductProfitabilityEligibilityInput, type ProductProfitabilityEligibilityReason } from "./productProfitabilityEligibility";
+import { calculateProductProfitabilityV1OrderCost, type ProductProfitabilityV1OrderCost } from "./productProfitabilityV1CostCalculation";
 
 export interface ProductProfitabilityRawOrderFacts {
   orderId: Id;
@@ -26,7 +26,7 @@ interface ProductProfitabilityOrderEvaluationBase {
 export interface EligibleProductProfitabilityOrderEvaluation extends ProductProfitabilityOrderEvaluationBase {
   classification: "eligible";
   productId: Id;
-  trueCost: TrueCostResult;
+  trueCost: ProductProfitabilityV1OrderCost;
 }
 
 export interface UnallocatedProductProfitabilityOrderEvaluation extends ProductProfitabilityOrderEvaluationBase {
@@ -75,6 +75,6 @@ export function evaluateProductProfitabilityOrder(input: ProductProfitabilityOrd
     classification: "eligible",
     ...base,
     productId: eligibility.attributedProductId,
-    trueCost: calculateTrueCost({ order, items: [...items], rules: [...rules], allocations: [...allocations], calculatedAt }),
+    trueCost: calculateProductProfitabilityV1OrderCost({ order, items, rules, allocations, calculatedAt }),
   };
 }
