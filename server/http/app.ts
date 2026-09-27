@@ -48,7 +48,9 @@ export function createProfitPilotApi() {
   });
   app.use(express.json({ limit: "128kb" }));
   app.use(rateLimit);
-  app.get("/health", (_request, response) => response.json({ status: "ok" }));
+  // Keep the standalone-server probe while also exposing it beneath Vercel's
+  // file-based `/api` function namespace.
+  app.get(["/health", "/api/v1/health"], (_request, response) => response.json({ status: "ok" }));
   app.post("/api/v1/internal/salla-sync", async (request, response, next) => {
     try {
       if (!internalWorkerAuthorized(request)) throw new ApiError("UNAUTHORIZED", "A worker authorization is required");
