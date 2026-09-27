@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:vercel:api": "esbuild server/http/app.ts --platform=node --target=node22 --packages=external --bundle --format=esm --outfile=dist/vercel/api.mjs",
+    "build:vercel": "vite build && pnpm run build:vercel:api",
+    "test:vercel": "node --test tests/vercel-bundle.test.mjs",
     "start": "NODE_ENV=production node dist/index.js",
     "preview": "vite preview --host",
     "check": "tsc --noEmit --incremental false",

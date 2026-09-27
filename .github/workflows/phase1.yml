@@ -21,3 +21,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run check
       - run: pnpm run test:phase1
+      - run: pnpm run build:vercel
+      - run: pnpm run test:vercel
