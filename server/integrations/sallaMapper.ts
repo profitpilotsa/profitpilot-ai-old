@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Customer } from "../domain/customer";
 import type { Order, OrderItem, Product, ProductStatus, Variant } from "../domain/commerce";
+import { money, type MinorUnit } from "../domain/money";
 import type { DataScope, Id } from "../domain/tenant";
 
 /**
@@ -46,15 +47,16 @@ export class SallaCanonicalMapper {
     const externalId = requiredId(value.id, "order");
     const amounts = value.amounts;
     if (!Array.isArray(amounts?.discounts)) throw new Error("Salla order discounts are required");
-    const discounts = amounts.discounts.reduce((sum, discount) => sum + money(discount.discount, "order discount"), 0);
+    const discounts = amounts.discounts.reduce<MinorUnit>((sum, discount) => money(sum + requiredMoney(discount.discount, "order discount")), money(0));
+    const status = statusSlug(value.status);
     return {
       ...this.scope, id: canonicalId(this.scope, "order", externalId), externalId,
       customerId: this.optionalCanonicalId(value.customer?.id, "customer"), source: "platform",
-      sourceStatus: text(value.status?.slug ?? value.status), status: orderStatus(value.status?.slug ?? value.status),
+      sourceStatus: text(status), status: orderStatus(status),
       currency: requiredText(amounts?.sub_total?.currency ?? value.currency, "order currency"),
-      merchandiseGross: money(amounts?.sub_total?.amount, "order merchandise subtotal"), discounts,
-      taxAmount: optionalMoney(amounts?.tax?.amount?.amount), shippingCharged: money(amounts?.shipping_cost?.amount, "order shipping cost"),
-      refundedAmount: money(value.payment_actions?.refund_action?.refund_amount?.amount, "order refund amount"), revenueBasis: "unknown",
+      merchandiseGross: requiredMoney(amounts?.sub_total?.amount, "order merchandise subtotal"), discounts,
+      taxAmount: optionalMoney(amounts?.tax?.amount?.amount), shippingCharged: requiredMoney(amounts?.shipping_cost?.amount, "order shipping cost"),
+      refundedAmount: requiredMoney(value.payment_actions?.refund_action?.refund_amount?.amount, "order refund amount"), revenueBasis: "unknown",
       orderedAt: requiredIso(value.date?.date ?? value.created_at, "order date"), sourceUpdatedAt: iso(value.updated_at),
     };
   }
@@ -64,15 +66,15 @@ export class SallaCanonicalMapper {
     const productId = this.optionalCanonicalId(value.product_id ?? value.product?.id, "product");
     const variantId = this.optionalCanonicalId(value.variant_id ?? value.variant?.id, "variant");
     const quantitySold = quantity(value.quantity, "order item quantity");
-    const lineTotal = money(value.amounts?.total?.amount, "order item total");
+    const lineTotal = requiredMoney(value.amounts?.total?.amount, "order item total");
     if (lineTotal % quantitySold !== 0) throw new Error("Salla order item total cannot be represented as exact minor-unit price");
     return {
       ...this.scope, id: canonicalId(this.scope, "order-item", externalId), externalId,
       orderId: canonicalId(this.scope, "order", requiredId(orderExternalId, "order item order")),
       productId, variantId, source: "platform", title: requiredText(value.name ?? value.title, "order item title"),
       quantity: quantitySold, returnedQuantity: optionalQuantity(value.returned_quantity) ?? 0,
-      unitGross: lineTotal / quantitySold,
-      discountAmount: money(value.amounts?.total_discount?.amount, "order item discount"),
+      unitGross: money(lineTotal / quantitySold),
+      discountAmount: requiredMoney(value.amounts?.total_discount?.amount, "order item discount"),
       sourceUpdatedAt: iso(value.updated_at),
     };
   }
@@ -98,6 +100,7 @@ export type SallaOrderItemRecord = { id: string | number; name?: unknown; title?
 
 function productStatus(value: unknown): ProductStatus { return text(value) === "sale" ? "active" : "unknown"; }
 function orderStatus(value: unknown): Order["status"] { const normalized = text(value)?.toLowerCase(); return ["pending", "paid", "fulfilled", "cancelled", "refunded", "partially_refunded", "returned"].includes(normalized ?? "") ? normalized as Order["status"] : "unknown"; }
+function statusSlug(value: unknown): unknown { return value && typeof value === "object" && "slug" in value ? (value as { slug?: unknown }).slug : value; }
 function text(value: unknown): string | undefined { return typeof value === "string" && value.trim() ? value.trim() : undefined; }
 function textOrNumber(value: unknown): string | undefined { return text(value) ?? (typeof value === "number" && Number.isFinite(value) ? String(value) : undefined); }
 function requiredText(value: unknown, label: string): string { const result = text(value); if (!result) throw new Error(`Salla ${label} is required`); return result; }
@@ -108,5 +111,5 @@ function joinName(first: unknown, last: unknown): string | undefined { const res
 function requiredIso(value: unknown, label: string): string { const result = iso(value); if (!result) throw new Error(`Salla ${label} is required`); return result; }
 function quantity(value: unknown, label: string): number { const numeric = typeof value === "number" ? value : Number(value); if (!Number.isSafeInteger(numeric) || numeric < 0) throw new Error(`Salla ${label} must be a non-negative safe integer`); return numeric; }
 function optionalQuantity(value: unknown): number | undefined { return value === undefined || value === null ? undefined : quantity(value, "returned quantity"); }
-function money(value: unknown, label: string): number { const result = optionalMoney(value); if (result === undefined) throw new Error(`Salla ${label} is required`); return result; }
-function optionalMoney(value: unknown): number | undefined { if (value === undefined || value === null || value === "") return undefined; const string = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim() : undefined; if (!string || !/^-?\d+(\.\d{1,2})?$/.test(string)) throw new Error("Salla money must be a decimal amount with at most two places"); const [whole, fraction = ""] = string.split("."); const minor = Number(whole) * 100 + (Number(fraction.padEnd(2, "0")) * (whole.startsWith("-") ? -1 : 1)); if (!Number.isSafeInteger(minor)) throw new Error("Salla money exceeds safe minor-unit range"); return minor; }
+function requiredMoney(value: unknown, label: string): MinorUnit { const result = optionalMoney(value); if (result === undefined) throw new Error(`Salla ${label} is required`); return result; }
+function optionalMoney(value: unknown): MinorUnit | undefined { if (value === undefined || value === null || value === "") return undefined; const string = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim() : undefined; if (!string || !/^-?\d+(\.\d{1,2})?$/.test(string)) throw new Error("Salla money must be a decimal amount with at most two places"); const [whole, fraction = ""] = string.split("."); const minor = Number(whole) * 100 + (Number(fraction.padEnd(2, "0")) * (whole.startsWith("-") ? -1 : 1)); return money(minor); }
