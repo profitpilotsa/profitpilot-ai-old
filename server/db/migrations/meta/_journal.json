@@ -8,6 +8,13 @@
       "when": 1789945557915,
       "tag": "0000_high_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790000000000,
+      "tag": "0001_phase1_security_foundation",
+      "breakpoints": true
     }
   ]
 }

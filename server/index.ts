@@ -2,12 +2,13 @@ import express from "express";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createProfitPilotApi } from "./http/app";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
-  const app = express();
+  const app = createProfitPilotApi();
   const server = createServer(app);
 
   // Serve static files from dist/public in production

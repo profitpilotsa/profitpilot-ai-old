@@ -7,8 +7,9 @@ export interface User { id: Id; externalSubject: string; email?: string; display
 export interface Organization { id: Id; name: string; defaultCurrency: string; mode: DataMode; }
 export interface OrganizationMembership { organizationId: Id; userId: Id; role: OrganizationRole; }
 export interface Store { id: Id; organizationId: Id; name: string; platform: Platform; externalStoreId?: string; currency: string; status: "active" | "disconnected" | "error" | "demo"; }
-export interface PlatformConnection { id: Id; organizationId: Id; storeId?: Id; provider: Platform; status: "not_connected" | "requires_setup" | "connected" | "demo" | "error"; credentialReference?: string; lastSyncAt?: string; }
-export interface DataScope { organizationId: Id; storeId?: Id; mode: DataMode; }
+export interface PlatformConnection { id: Id; organizationId: Id; storeId: Id; provider: Platform; status: "not_connected" | "requires_setup" | "connected" | "demo" | "error"; credentialReference?: string; lastSyncAt?: string; }
+/** Canonical persistence is always organization + store scoped; no default-store fallback exists. */
+export interface DataScope { organizationId: Id; storeId: Id; mode: DataMode; }
 export interface SyncJob { id: Id; organizationId: Id; connectionId: Id; status: "queued" | "running" | "succeeded" | "failed"; idempotencyKey: string; attempt: number; }
 export interface WebhookEvent { id: Id; organizationId?: Id; provider: Platform; externalEventId: string; status: "received" | "verified" | "processed" | "failed"; }
 export interface AuditEvent { id: Id; organizationId: Id; actorUserId?: Id; action: string; entityType: string; entityId?: Id; result: "success" | "failure" | "pending"; }

@@ -1,0 +1,4 @@
+const sensitive = /authorization|token|secret|password|cookie|credential|database_url/i;
+export function redact(value: unknown): unknown { if (Array.isArray(value)) return value.map(redact); if (!value || typeof value !== "object") return value; return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, sensitive.test(key) ? "[REDACTED]" : redact(item)])); }
+export interface StructuredLogger { info(event: string, fields?: Record<string, unknown>): void; error(event: string, fields?: Record<string, unknown>): void; }
+export const consoleLogger: StructuredLogger = { info: (event, fields = {}) => console.info(JSON.stringify({ level: "info", event, ...(redact(fields) as Record<string, unknown>) })), error: (event, fields = {}) => console.error(JSON.stringify({ level: "error", event, ...(redact(fields) as Record<string, unknown>) })) };
