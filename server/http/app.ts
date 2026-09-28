@@ -1,8 +1,8 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { createDatabase } from "../db/client";
-import { CommerceQueryService } from "../application/commerceQueryService";
-import { SupabaseAuthVerifier } from "../foundation/auth";
+import { CommerceQueryService, type ScopedCommerceReader } from "../application/commerceQueryService";
+import { SupabaseAuthVerifier, type AuthVerifier } from "../foundation/auth";
 import { RequestContextResolver } from "../foundation/context";
 import { PostgresIntegrationRepository } from "../foundation/postgresIntegrationRepository";
 import { PostgresTenantRepository } from "../foundation/postgresTenantRepository";
@@ -10,7 +10,7 @@ import { consoleLogger } from "../foundation/observability";
 import { PostgresCommerceRepository } from "../repositories/postgresCommerce";
 import { SallaWebhookReceiver } from "../application/sallaWebhookReceiver";
 import { SallaSyncWorker } from "../application/sallaSyncWorker";
-import { ApiError, type Mode } from "../phase1";
+import { ApiError, type TenantRepository, type User } from "../phase1";
 
 type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
@@ -25,8 +25,19 @@ function bearer(request: Request): string { const value = request.header("author
 function header(request: Request, name: string): string { const value = request.header(name); if (!value) throw new ApiError("VALIDATION_ERROR", `${name} is required`); return value; }
 function internalWorkerAuthorized(request: Request): boolean { const secret = process.env.SALLA_SYNC_WORKER_SECRET; const received = request.header("authorization"); if (!secret || !received) return false; const expected = Buffer.from(`Bearer ${secret}`); const supplied = Buffer.from(received); return expected.length === supplied.length && timingSafeEqual(expected, supplied); }
 
+/** Server construction only: no request can select these dependencies. */
+export interface CommerceDependencies {
+  auth: AuthVerifier;
+  tenants: TenantRepository & { findUserBySubject(subject: string): Promise<User | undefined> };
+  commerce: ScopedCommerceReader;
+}
+function productionCommerceDependencies(): CommerceDependencies {
+  const db = createDatabase();
+  return { auth: new SupabaseAuthVerifier(), tenants: new PostgresTenantRepository(db), commerce: new PostgresCommerceRepository(db) };
+}
+
 /** Creates API routes only; static hosting remains in server/index.ts. */
-export function createProfitPilotApi() {
+export function createProfitPilotApi(commerceDependencies: () => CommerceDependencies = productionCommerceDependencies) {
   const app = express();
   app.disable("x-powered-by");
   // This route deliberately runs before express.json(): Salla's signature covers
@@ -62,15 +73,14 @@ export function createProfitPilotApi() {
   app.get("/api/v1/commerce/products", async (request, response, next) => {
     const requestId = request.header("x-request-id") || randomUUID();
     try {
-      const db = createDatabase();
-      const tenantRepository = new PostgresTenantRepository(db);
-      const auth = new SupabaseAuthVerifier();
-      const subject = await auth.verifyBearer(bearer(request));
+      const token = bearer(request);
+      const { auth, tenants: tenantRepository, commerce } = commerceDependencies();
+      const subject = await auth.verifyBearer(token);
       const user = await tenantRepository.findUserBySubject(subject.subject);
       if (!user) throw new ApiError("FORBIDDEN", "No ProfitPilot workspace membership exists for this identity");
-      const context = await new RequestContextResolver(auth, tenantRepository).resolve({ bearerToken: bearer(request), user, organizationId: header(request, "x-profitpilot-organization"), storeId: header(request, "x-profitpilot-store"), mode: header(request, "x-profitpilot-mode") as Mode, requestId });
+      const context = await new RequestContextResolver(auth, tenantRepository).resolve({ bearerToken: token, user, organizationId: header(request, "x-profitpilot-organization"), storeId: header(request, "x-profitpilot-store"), mode: header(request, "x-profitpilot-mode"), requestId });
       const platform = header(request, "x-profitpilot-platform");
-      const data = await new CommerceQueryService(new PostgresCommerceRepository(db)).listProducts(context, platform);
+      const data = await new CommerceQueryService(commerce).listProducts(context, platform);
       response.setHeader("x-request-id", requestId).json({ data, requestId });
     } catch (error) { next(error); }
   });

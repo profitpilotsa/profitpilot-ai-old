@@ -1,17 +1,17 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { memberships, organizations, stores, users } from "../db/schema";
-import type { Membership, Organization, Store, TenantRepository } from "../phase1";
+import { parseMode, parseRole, type Membership, type Organization, type Store, type TenantRepository } from "../phase1";
 
 export class PostgresTenantRepository implements TenantRepository {
   constructor(private readonly db: Database) {}
   async findMembership(userId: string, organizationId: string): Promise<Membership | undefined> {
     const [row] = await this.db.select().from(memberships).where(and(eq(memberships.userId, userId), eq(memberships.organizationId, organizationId)));
-    return row ? { userId: row.userId, organizationId: row.organizationId, role: row.role as Membership["role"] } : undefined;
+    return row ? { userId: row.userId, organizationId: row.organizationId, role: parseRole(row.role) } : undefined;
   }
   async findOrganization(organizationId: string): Promise<Organization | undefined> {
     const [row] = await this.db.select().from(organizations).where(eq(organizations.id, organizationId));
-    return row ? { id: row.id, name: row.name, defaultCurrency: row.defaultCurrency, mode: row.mode as Organization["mode"] } : undefined;
+    return row ? { id: row.id, name: row.name, defaultCurrency: row.defaultCurrency, mode: parseMode(row.mode) } : undefined;
   }
   async findStore(organizationId: string, storeId: string): Promise<Store | undefined> {
     const [row] = await this.db.select().from(stores).where(and(eq(stores.id, storeId), eq(stores.organizationId, organizationId)));

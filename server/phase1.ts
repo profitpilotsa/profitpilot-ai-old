@@ -1,6 +1,7 @@
 /** UI-independent Phase 1 security contracts. */
 export type Id = string;
-export type Mode = "demo" | "live";
+export const MODES = ["demo", "live"] as const;
+export type Mode = typeof MODES[number];
 export type Role = "owner" | "admin" | "manager" | "marketing" | "finance" | "inventory" | "viewer";
 export type Platform = "salla" | "zid" | "shopify" | "other";
 export type Permission = "workspace.read" | "commerce.read" | "integration.read" | "integration.connect" | "integration.sync" | "audit.read" | "financial_truth.read" | "financial_truth.recalculate" | "cost.configure" | "inventory.read" | "marketing.read";
@@ -26,9 +27,22 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   viewer: ["workspace.read", "commerce.read"],
 };
 
+/** Runtime boundaries reject unknown values without coercion or defaults. */
+export function parseMode(value: unknown): Mode {
+  if (value === MODES[0] || value === MODES[1]) return value;
+  throw new ApiError("VALIDATION_ERROR", "A supported environment is required");
+}
+function isRole(value: unknown): value is Role {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(ROLE_PERMISSIONS, value);
+}
+export function parseRole(value: unknown): Role {
+  if (isRole(value)) return value;
+  throw new ApiError("FORBIDDEN", "The organization role is not supported");
+}
+
 export function authorize(context: RequestContext, permission: Permission): void {
   if (context.membership.userId !== context.actor.id || context.membership.organizationId !== context.scope.organizationId || !context.scope.storeId) throw new ApiError("FORBIDDEN", "The authenticated user is not authorized for this organization and store scope");
-  if (!ROLE_PERMISSIONS[context.membership.role].includes(permission)) throw new ApiError("FORBIDDEN", "This organization role cannot perform that action");
+  if (!ROLE_PERMISSIONS[parseRole(context.membership.role)].includes(permission)) throw new ApiError("FORBIDDEN", "This organization role cannot perform that action");
 }
 export function assertLiveProviderAction(context: RequestContext): void { if (context.scope.mode !== "live") throw new ApiError("FORBIDDEN", "Demo contexts cannot invoke provider operations"); }
 export function assertNoDirectFinancialMutation(): never { throw new ApiError("FORBIDDEN", "Authoritative financial outputs can only change through governed source, reconciliation, or recalculation workflows"); }
